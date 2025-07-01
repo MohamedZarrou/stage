@@ -74,7 +74,7 @@ CREATE TABLE `us` (
 
 CREATE TABLE `utilisateurs` (
   `PPR` int(25) NOT NULL,
-  `Cin` int(25) NOT NULL,
+  `Cin` varchar(25) NOT NULL,
   `prenom` varchar(25) NOT NULL,
   `nom` varchar(25) NOT NULL,
   `d_naiss` date NOT NULL,
