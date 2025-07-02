@@ -1,6 +1,13 @@
 <?php 
 include "../sql/db.php";
 $PPR=$_GET["PPR"];
+if(isset($_POST["add"])){
+    header("location:add_historique.php?PPR=$PPR");
+    exit();
+
+}
+
+$PPR=$_GET["PPR"];
 $db = Database::getInstance()->getConnection();
 $sql="SELECT * FROM hist_affectation WHERE PPR=:PPR";
 $stmt=$db->prepare($sql);
@@ -45,5 +52,9 @@ if(isset($_POST["supprimer"])){
         <?php  endforeach;?>
         
     </table>
+    <form action="" method="POST">
+         <input type="submit" name="add" value="add">
+</form>
+    
 </body>
 </html>

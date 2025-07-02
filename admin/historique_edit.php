@@ -15,6 +15,7 @@ if(isset($_POST["retour"])){
 
 }
 
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["save"])) {
     $sqlUpdate = "UPDATE hist_affectation SET 
         Code=:Code,
@@ -71,6 +72,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["save"])) {
     <input type="date" name="date_fin" value="<?= htmlspecialchars($historique["date_fin"]) ?>" >
     <input type="submit" value="save" name="save">
     <input type="submit" value="retour" name="retour">
+   
 </form>
 
 

@@ -49,7 +49,7 @@ if(isset($_POST["supprimer"])){
 
             </tr>
         <?php  endforeach;?>
-        
+        <a href="diploms_add.php?PPR=<?= htmlspecialchars($PPR)?>"> <button>add diplom</button></a>
     </table>
 </body>
 </html>
