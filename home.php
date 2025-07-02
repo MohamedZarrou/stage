@@ -1,10 +1,15 @@
 <?php
 include("sql/db.php");
-$db = Database::getInstance()->getConnection();
-$sql = "SELECT * FROM utilisateurs";
-$stmt = $db->prepare($sql);
-$stmt->execute();
-$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+try {
+    $db = Database::getInstance()->getConnection();
+    $sql = "SELECT * FROM utilisateurs";
+    $stmt = $db->prepare($sql);
+    $stmt->execute();
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    die("Database error: " . $e->getMessage());
+}
 ?>
 
 <!DOCTYPE html>
@@ -122,6 +127,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="text-center mb-5">
       <h1>Liste des Utilisateurs</h1>
     </div>
+
     <div class="row g-4">
       <?php foreach ($users as $user): ?>
         <div class="col-sm-6 col-md-4 col-lg-3">
@@ -137,6 +143,12 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
       <?php endforeach; ?>
     </div>
+
+    <!-- Add User Button -->
+    <div class="text-center mt-5">
+      <a href="user_add.php" class="btn btn-primary btn-lg">Add User</a>
+    </div>
+
   </div>
 </body>
 </html>
