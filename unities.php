@@ -80,6 +80,7 @@ if ($view_employees && $current_us_ppr) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unités de Service</title>
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -379,13 +380,18 @@ if ($view_employees && $current_us_ppr) {
             <i class="fas fa-building"></i>
             <?= $view_employees ? "Employés de l'Unité de Service" : "Unités de Service" ?>
         </h1>
+        <a href="dash.php" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour au dashboard
+        </a>
+
         
         <?php if ($view_employees && $current_us): ?>
             <!-- Back button when viewing employees -->
-            <a href="?" class="back-button">
+            <a href="?" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Retour à la liste des unités
             </a>
             
+            <br><br>
             <!-- Current US Info -->
             <div class="us-card">
                 <h3><?= htmlspecialchars($current_us['lib']) ?></h3>
@@ -395,6 +401,7 @@ if ($view_employees && $current_us_ppr) {
                     <p><strong>Bâtiment:</strong> <?= htmlspecialchars($current_us['Batiment']) ?></p>
                 </div>
                 <div class="action-buttons">
+                    
                     <a href="admin/us.php?PPR=<?= urlencode($current_us['PPR']) ?>" class="btn btn-warning">
                         <i class="fas fa-edit"></i> Modifier
                     </a>
