@@ -1,58 +1,40 @@
 <?php
 include "sql/db.php";
 
-$error = '';
-$success = '';
+if (isset($_POST["confirm"])) {
+    $email = $_POST["email"];
+    $password = $_POST["password"];
 
-if (isset($_POST['signup'])) {
-    $Cin = $_POST['Cin'];
-    
-    // Check if employee exists
     $db = Database::getInstance()->getConnection();
-    $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE Cin = :Cin" );
-    $stmt->bindParam(":Cin", $Cin);
+    $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE email = :email");
+    $stmt->bindParam(":email", $email);
     $stmt->execute();
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$employee) {
-        $error = "You are not registered as an employee. Please contact HR.";
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $prenom=$user["prenom"];
+    $role=$user["role"];
+    $nom=$user["nom"];
+
+    if (!$user || !password_verify($password, $user['password'])) {
+        $error = "Invalid email or password";
     } else {
-        // Employee exists, proceed with registration
-        $email = $_POST['email'];
-        $password = $_POST['password'];
-        
-        // Check if email already exists
-        $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE email = :email");
-        $stmt->bindParam(":email", $email);
-        $stmt->execute();
-        
-        if ($stmt->fetch()) {
-            $error = "Email already registered. Please use another email or login.";
-        } else {
-            // Update the employee record with email and password
-            $hash=password_hash($password,PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE utilisateurs SET email = :email, password = :password WHERE PPR = :ppr");
-            $stmt->bindParam(":email", $email);
-            $stmt->bindParam(":password", $hash);
-            $stmt->bindParam(":ppr", $employee['PPR']);
-            
-            if ($stmt->execute()) {
-                $success = "Registration successful! Redirecting to login...";
-                header("refresh:2;url=login.php");
-            } else {
-                $error = "Registration failed. Please try again.";
-            }
-        }
+        session_start();
+        $_SESSION['user'] = $user;
+        setcookie("prenom", $prenom, time() + (86400 * 30), "/"); 
+        setcookie("nom", $nom, time() + (86400 * 30), "/"); 
+        setcookie("role", $role, time() + (86400 * 30), "/"); 
+        header("Location: dash.php");
+        exit();
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up | Employee Portal</title>
+    <title>Login | Employee Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         :root {
@@ -86,13 +68,13 @@ if (isset($_POST['signup'])) {
             background-attachment: fixed;
         }
 
-        .signup-container {
+        .login-container {
             width: 100%;
-            max-width: 450px;
+            max-width: 400px;
             margin: 2rem;
         }
 
-        .signup-card {
+        .login-card {
             background: white;
             border-radius: 10px;
             box-shadow: var(--shadow);
@@ -100,24 +82,24 @@ if (isset($_POST['signup'])) {
             transition: var(--transition);
         }
 
-        .signup-header {
+        .login-header {
             background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
             color: white;
             padding: 1.5rem;
             text-align: center;
         }
 
-        .signup-header h2 {
+        .login-header h2 {
             font-weight: 600;
             margin-bottom: 0.5rem;
         }
 
-        .signup-header p {
+        .login-header p {
             opacity: 0.9;
             font-size: 0.9rem;
         }
 
-        .signup-body {
+        .login-body {
             padding: 2rem;
         }
 
@@ -180,26 +162,28 @@ if (isset($_POST['signup'])) {
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
         }
 
-        .signup-footer {
+        .login-footer {
             text-align: center;
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid #eee;
         }
 
-        .signup-footer a {
+        .login-footer a {
             color: var(--primary-color);
             text-decoration: none;
             font-weight: 500;
             transition: var(--transition);
         }
 
-        .signup-footer a:hover {
+        .login-footer a:hover {
             color: var(--primary-dark);
             text-decoration: underline;
         }
 
-        .alert {
+        .error-message {
+            background: #fdecea;
+            color: var(--accent-color);
             padding: 12px;
             border-radius: 5px;
             margin-bottom: 1.5rem;
@@ -208,78 +192,38 @@ if (isset($_POST['signup'])) {
             align-items: center;
         }
 
-        .alert-error {
-            background: #fdecea;
-            color: var(--accent-color);
-        }
-
-        .alert-success {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-
-        .alert i {
+        .error-message i {
             margin-right: 8px;
         }
 
-        .name-fields {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .name-fields .form-group {
-            flex: 1;
-        }
-
-        /* Responsive */
         @media (max-width: 480px) {
-            .signup-container {
+            .login-container {
                 margin: 1rem;
             }
-            
-            .signup-body {
+
+            .login-body {
                 padding: 1.5rem;
-            }
-            
-            .name-fields {
-                flex-direction: column;
-                gap: 0;
             }
         }
     </style>
 </head>
 <body>
-    <div class="signup-container">
-        <div class="signup-card">
-            <div class="signup-header">
-                <h2><i class="fas fa-user-plus"></i> Employee Registration</h2>
-                <p>Create your account to access the portal</p>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h2><i class="fas fa-sign-in-alt"></i> Employee Login</h2>
+                <p>Access your employee dashboard</p>
             </div>
             
-            <div class="signup-body">
-                <?php if ($error): ?>
-                    <div class="alert alert-error">
+            <div class="login-body">
+                <?php if (isset($error)): ?>
+                    <div class="error-message">
                         <i class="fas fa-exclamation-circle"></i>
                         <span><?php echo $error; ?></span>
                     </div>
                 <?php endif; ?>
                 
-                <?php if ($success): ?>
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle"></i>
-                        <span><?php echo $success; ?></span>
-                    </div>
-                <?php endif; ?>
-                
                 <form action="" method="POST">
-                    <div class="name-fields">
-                        <div class="form-group">
-                            <label for="Cin"> Cin</label>
-                            <i class="fas fa-user input-icon"></i>
-                            <input type="text" id="Cin" name="Cin" class="form-control" placeholder="Enter CIN" required>
-                        </div>
-                    </div>
-                    
                     <div class="form-group">
                         <label for="email">Email Address</label>
                         <i class="fas fa-envelope input-icon"></i>
@@ -289,16 +233,16 @@ if (isset($_POST['signup'])) {
                     <div class="form-group">
                         <label for="password">Password</label>
                         <i class="fas fa-lock input-icon"></i>
-                        <input type="password" id="password" name="password" class="form-control" placeholder="Create a password" required>
+                        <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password" required>
                     </div>
                     
-                    <button type="submit" name="signup" class="btn btn-primary">
-                        <i class="fas fa-user-plus"></i> Register Account
+                    <button type="submit" name="confirm" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Login
                     </button>
                 </form>
                 
-                <div class="signup-footer">
-                    Already registered? <a href="login.php">Sign in here</a>
+                <div class="login-footer">
+                    Don't have an account? <a href="signup.php">Create one</a>
                 </div>
             </div>
         </div>

@@ -14,10 +14,10 @@ if (isset($_POST["save"])) {
 
     $sql = "INSERT INTO utilisateurs (
         nom, prenom, Cin, d_naiss, d_recrutement, sit_familliale, genre,
-        role, email, fonction, grade, img, mime_type
+        role, fonction, grade, img, mime_type
     ) VALUES (
         :nom, :prenom, :Cin, :d_naiss, :d_recrutement, :sit_familiale, :genre,
-        :role, :email, :fonction, :grade, :img, :mime_type
+        :role, :fonction, :grade, :img, :mime_type
     )";
 
     $stmt = $db->prepare($sql);
@@ -29,7 +29,6 @@ if (isset($_POST["save"])) {
     $stmt->bindParam(":sit_familiale", $_POST["sit_familliale"]);
     $stmt->bindParam(":genre", $_POST["genre"]);
     $stmt->bindParam(":role", $_POST["role"]);
-    $stmt->bindParam(":email", $_POST["email"]);
     $stmt->bindParam(":fonction", $_POST["fonction"]);
     $stmt->bindParam(":grade", $_POST["grade"]);
     $stmt->bindParam(":img", $imgData, PDO::PARAM_LOB);
@@ -51,7 +50,7 @@ if (isset($_POST["save"])) {
             margin-top: 10px;
             font-weight: bold;
         }
-        input[type="text"], input[type="date"], input[type="email"], input[type="file"] {
+        input[type="text"], input[type="date"], input[type="email"], input[type="file"], select {
             width: 300px;
             padding: 5px;
         }
@@ -81,16 +80,25 @@ if (isset($_POST["save"])) {
     <input type="date" name="d_recrutement" required>
 
     <label for="sit_familliale">Situation familiale</label>
-    <input type="text" name="sit_familliale">
+    <select name="sit_familliale" required>
+        <option value="">-- Sélectionner --</option>
+        <option value="Marié(e)">Marié(e)</option>
+        <option value="Célibataire">Célibataire</option>
+    </select>
 
     <label for="genre">Genre</label>
-    <input type="text" name="genre">
+    <select name="genre" required>
+        <option value="">-- Sélectionner --</option>
+        <option value="Homme">Homme</option>
+        <option value="Femme">Femme</option>
+    </select>
 
     <label for="role">Rôle</label>
-    <input type="text" name="role">
-
-    <label for="email">Email</label>
-    <input type="email" name="email">
+    <select name="role" required>
+        <option value="">-- Sélectionner --</option>
+        <option value="admin">Admin</option>
+        <option value="user">User</option>
+    </select>
 
     <label for="fonction">Fonction</label>
     <input type="text" name="fonction">
