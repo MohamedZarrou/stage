@@ -2,12 +2,55 @@
 include "sql/db.php";
 $db = Database::getInstance()->getConnection();
 
+// Handle filtering
+$filter_lib = $_GET['filter_lib'] ?? '';
+$filter_type = $_GET['filter_type'] ?? '';
+$filter_batiment = $_GET['filter_batiment'] ?? '';
+
+// Handle delete action
+if (isset($_GET['delete_ppr'])) {
+    $ppr_to_delete = $_GET['delete_ppr'];
+    $stmt = $db->prepare("DELETE FROM us WHERE PPR = ?");
+    $stmt->execute([$ppr_to_delete]);
+    header("Location: ?");
+    exit;
+}
+
 // Check if we're viewing employees for a specific US
 $view_employees = isset($_GET['view_employees']);
 $current_us_ppr = $_GET['ppr'] ?? null;
 
-// Get all US units
-$us_list = $db->query("SELECT * FROM us ORDER BY lib")->fetchAll(PDO::FETCH_ASSOC);
+// Build the base query for US units
+$sql = "SELECT * FROM us WHERE 1=1";
+$params = [];
+
+if (!empty($filter_lib)) {
+    $sql .= " AND lib LIKE :lib";
+    $params[':lib'] = "%$filter_lib%";
+}
+
+if (!empty($filter_type)) {
+    $sql .= " AND type = :type";
+    $params[':type'] = $filter_type;
+}
+
+if (!empty($filter_batiment)) {
+    $sql .= " AND Batiment = :batiment";
+    $params[':batiment'] = $filter_batiment;
+}
+
+$sql .= " ORDER BY lib";
+
+$stmt = $db->prepare($sql);
+foreach ($params as $key => $value) {
+    $stmt->bindValue($key, $value);
+}
+$stmt->execute();
+$us_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get distinct values for filter dropdowns
+$types = $db->query("SELECT DISTINCT type FROM us ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+$batiments = $db->query("SELECT DISTINCT Batiment FROM us ORDER BY Batiment")->fetchAll(PDO::FETCH_COLUMN);
 
 // If viewing employees, get the US info and its employees
 $current_us = null;
@@ -79,6 +122,57 @@ if ($view_employees && $current_us_ppr) {
             align-items: center;
             justify-content: center;
             gap: 10px;
+        }
+        
+        /* Filter Section */
+        .filter-section {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+        
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus,
+        select:focus {
+            border-color: var(--primary-blue);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(91, 155, 213, 0.2);
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
         }
         
         .back-button {
@@ -161,6 +255,39 @@ if ($view_employees && $current_us_ppr) {
             background-color: #4a8bc9;
         }
         
+        .btn-secondary {
+            background-color: var(--secondary-blue);
+            color: var(--text-dark);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #8ab5e0;
+        }
+        
+        .btn-danger {
+            background-color: var(--error-color);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-warning {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #d35400;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
         /* Employees List */
         .employees-section {
             margin-top: 40px;
@@ -223,7 +350,7 @@ if ($view_employees && $current_us_ppr) {
             font-size: 14px;
         }
         
-        .no-employees {
+        .no-employees, .no-results {
             text-align: center;
             padding: 20px;
             color: #666;
@@ -233,6 +360,15 @@ if ($view_employees && $current_us_ppr) {
         @media (max-width: 768px) {
             .us-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
@@ -257,6 +393,14 @@ if ($view_employees && $current_us_ppr) {
                     <p><strong>Type:</strong> <?= htmlspecialchars($current_us['type']) ?></p>
                     <p><strong>Cellule mère:</strong> <?= htmlspecialchars($current_us['cellule_mere']) ?></p>
                     <p><strong>Bâtiment:</strong> <?= htmlspecialchars($current_us['Batiment']) ?></p>
+                </div>
+                <div class="action-buttons">
+                    <a href="admin/us.php?PPR=<?= urlencode($current_us['PPR']) ?>" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> Modifier
+                    </a>
+                    <a href="?delete_ppr=<?= urlencode($current_us['PPR']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette unité de service?')">
+                        <i class="fas fa-trash"></i> Supprimer
+                    </a>
                 </div>
             </div>
             
@@ -294,22 +438,81 @@ if ($view_employees && $current_us_ppr) {
             </div>
             
         <?php else: ?>
-            <!-- Main US Listing -->
-            <div class="us-grid">
-                <?php foreach ($us_list as $us): ?>
-                    <div class="us-card">
-                        <h3><?= htmlspecialchars($us['lib']) ?></h3>
-                        <div class="us-info">
-                            <p><strong>Type:</strong> <?= htmlspecialchars($us['type']) ?></p>
-                            <p><strong>Cellule mère:</strong> <?= htmlspecialchars($us['cellule_mere']) ?></p>
-                            <p><strong>Bâtiment:</strong> <?= htmlspecialchars($us['Batiment']) ?></p>
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <form method="GET" action="">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filter_lib">Libellé</label>
+                            <input type="text" id="filter_lib" name="filter_lib" value="<?= htmlspecialchars($filter_lib) ?>" placeholder="Rechercher par libellé">
                         </div>
-                        <a href="?view_employees=true&ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-primary">
-                            <i class="fas fa-users"></i> Voir les employés
+                        
+                        <div class="filter-group">
+                            <label for="filter_type">Type</label>
+                            <select id="filter_type" name="filter_type">
+                                <option value="">Tous les types</option>
+                                <?php foreach ($types as $type): ?>
+                                    <option value="<?= htmlspecialchars($type) ?>" <?= $filter_type === $type ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($type) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="filter_batiment">Bâtiment</label>
+                            <select id="filter_batiment" name="filter_batiment">
+                                <option value="">Tous les bâtiments</option>
+                                <?php foreach ($batiments as $batiment): ?>
+                                    <option value="<?= htmlspecialchars($batiment) ?>" <?= $filter_batiment === $batiment ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($batiment) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                        <a href="?" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Réinitialiser
                         </a>
                     </div>
-                <?php endforeach; ?>
+                </form>
             </div>
+            
+            <!-- Main US Listing -->
+            <?php if (count($us_list) > 0): ?>
+                <div class="us-grid">
+                    <?php foreach ($us_list as $us): ?>
+                        <div class="us-card">
+                            <h3><?= htmlspecialchars($us['lib']) ?></h3>
+                            <div class="us-info">
+                                <p><strong>Type:</strong> <?= htmlspecialchars($us['type']) ?></p>
+                                <p><strong>Cellule mère:</strong> <?= htmlspecialchars($us['cellule_mere']) ?></p>
+                                <p><strong>Bâtiment:</strong> <?= htmlspecialchars($us['Batiment']) ?></p>
+                            </div>
+                            <div class="action-buttons">
+                                <a href="?view_employees=true&ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-primary">
+                                    <i class="fas fa-users"></i> Employés
+                                </a>
+                                <a href="admin/us.php?PPR=<?= urlencode($us['PPR']) ?>" class="btn btn-warning">
+                                    <i class="fas fa-edit"></i> Modifier
+                                </a>
+                                <a href="?delete_ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette unité de service?')">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="no-results">
+                    <i class="fas fa-info-circle"></i> Aucune unité de service trouvée avec les critères sélectionnés
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </body>
