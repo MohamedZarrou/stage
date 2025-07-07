@@ -242,9 +242,10 @@ if (isset($_POST["confirm"])) {
                         <i class="fas fa-sign-in-alt"></i> Login
                     </button>
                 </form>
-                
+    
                 <div class="login-footer">
                     Don't have an account? <a href="signup.php">Create one</a>
+                    
                 </div>
             </div>
         </div>

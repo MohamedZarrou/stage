@@ -81,7 +81,7 @@ $currentUserPPR = $_SESSION['user']['PPR'];
 $currentUserImg = null;
 
 try {
-    $stmt = $db->prepare("SELECT img_profile, mime_type2 FROM utilisateurs WHERE PPR = :ppr");
+    $stmt = $db->prepare(query: "SELECT img_profile, mime_type2 FROM utilisateurs WHERE PPR = :ppr");
     $stmt->bindParam(':ppr', $currentUserPPR);
     $stmt->execute();
     $currentUserImg = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -529,30 +529,36 @@ $fullName = htmlspecialchars("$prenom $nom");
     </div>
     
     <!-- Main Menu -->
-    <div class="sidebar-menu">
-      <ul class="nav flex-column">
-        <li class="nav-item">
-          <a class="nav-link active" href="#">
-            <i class="bi bi-people-fill"></i> Users Management
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="unities.php">
-            <i class="bi bi-building"></i> Unities
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="diplomes.php">
-            <i class="bi bi-file-earmark-text"></i> Diplomas
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="">
-            <i class="bi bi-gear-fill"></i> Settings
-          </a>
-        </li>
-      </ul>
-    </div>
+   <!-- Main Menu -->
+<div class="sidebar-menu">
+  <ul class="nav flex-column">
+    <li class="nav-item">
+      <a class="nav-link active" href="#">
+        <i class="bi bi-people-fill"></i> Users Management
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="unities.php">
+        <i class="bi bi-building"></i> Unities
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="diplomes.php">
+        <i class="bi bi-award-fill"></i> Diplomas
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="community.php">
+        <i class="bi bi-people-fill"></i> Community
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="reclamations.php">
+        <i class="bi bi-exclamation-triangle-fill"></i> Reclamation
+      </a>
+    </li>
+  </ul>
+</div>
     
     <!-- Footer -->
     <div class="sidebar-footer p-3 text-center border-top">
@@ -569,16 +575,21 @@ $fullName = htmlspecialchars("$prenom $nom");
         <i class="bi bi-list"></i>
       </button>
       <a class="navbar-brand ms-3" href="#">
-        <i class="bi bi-people-fill me-2"></i>User Management System
+       <div class="tax-office-header" style="display: flex; align-items: center; gap: 10px; padding: 15px;">
+  <!-- Icon: Building with Columns (Symbolizing Government/Tax Authority) -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="blue" viewBox="0 0 16 16" style="flex-shrink: 0;">
+    <path d="M14.763.075A.5.5 0 0 1 15 .5v15a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V14h-1v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V10a.5.5 0 0 1 .342-.474L6 7.64V4.5a.5.5 0 0 1 .276-.447l8-4a.5.5 0 0 1 .487.022ZM6 8.694 1 10.36V15h5V8.694ZM7 15h2v-1.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5V15h2V1.309l-7 3.5V15Z"/>
+    <path d="M2 11h1v1H2v-1Zm2 0h1v1H4v-1Zm-2 2h1v1H2v-1Zm2 0h1v1H4v-1Zm4-4h1v1H8V9Zm2 0h1v1h-1V9Zm-2 2h1v1H8v-1Zm2 0h1v1h-1v-1Zm2-2h1v1h-1V9Zm0 2h1v1h-1v-1ZM8 7h1v1H8V7Zm2 0h1v1h-1V7Zm2 0h1v1h-1V7ZM8 5h1v1H8V5Zm2 0h1v1h-1V5Zm2 0h1v1h-1V5Zm0-2h1v1h-1V3Z"/>
+  </svg>
+  
+  <!-- Title -->
+  <h1 style="margin: 0; font-size: 1.5rem; color: #333; font-weight: 600;">
+  Regional Tax Directorate   
+  </h1>
+</div>
       </a>
       
-      <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <form class="d-flex ms-auto search-bar" method="GET" action="">
-          <i class="bi bi-search"></i>
-          <input class="form-control me-2" type="search" name="global_search" placeholder="Search users..." 
-                 value="<?= htmlspecialchars($_GET['global_search'] ?? '') ?>">
-        </form>
-        
+      
         <ul class="navbar-nav ms-3">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
@@ -642,9 +653,11 @@ $fullName = htmlspecialchars("$prenom $nom");
                 </ol>
               </nav>
             </div>
+             <?php if ($role === 'admin'): ?>
             <a href="admin/user_add.php" class="btn btn-primary">
               <i class="bi bi-plus-circle"></i> Add New User
             </a>
+            <?php endif; ?>
           </div>
         </div>
       </div>

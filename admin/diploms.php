@@ -3,9 +3,62 @@ include "../sql/db.php";
 $PPR = $_GET["PPR"];
 
 $db = Database::getInstance()->getConnection();
+
+// Initialize search and filter variables
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$level = isset($_GET['level']) ? $_GET['level'] : '';
+$institution = isset($_GET['institution']) ? $_GET['institution'] : '';
+$year = isset($_GET['year']) ? $_GET['year'] : '';
+$type = isset($_GET['type']) ? $_GET['type'] : '';
+
+// Base query
 $sql = "SELECT * FROM diplome WHERE PPR = :PPR";
+$params = [':PPR' => $PPR];
+
+// Add search condition
+if (!empty($search)) {
+    $sql .= " AND Lib LIKE :search";
+    $params[':search'] = '%' . $search . '%';
+}
+
+// Add filter conditions
+if (!empty($level)) {
+    $sql .= " AND niveau = :level";
+    $params[':level'] = $level;
+}
+
+if (!empty($institution)) {
+    $sql .= " AND etablissement = :institution";
+    $params[':institution'] = $institution;
+}
+
+if (!empty($year)) {
+    $sql .= " AND annee = :year";
+    $params[':year'] = $year;
+}
+
+if (!empty($type)) {
+    $sql .= " AND type = :type";
+    $params[':type'] = $type;
+}
+
+// Get unique values for filters
+$filterSql = "SELECT 
+    GROUP_CONCAT(DISTINCT niveau) as levels,
+    GROUP_CONCAT(DISTINCT etablissement) as institutions,
+    GROUP_CONCAT(DISTINCT annee) as years,
+    GROUP_CONCAT(DISTINCT type) as types
+    FROM diplome WHERE PPR = :PPR";
+$filterStmt = $db->prepare($filterSql);
+$filterStmt->bindparam(":PPR", $PPR);
+$filterStmt->execute();
+$filterData = $filterStmt->fetch(PDO::FETCH_ASSOC);
+
+// Prepare and execute main query
 $stmt = $db->prepare($sql);
-$stmt->bindparam(":PPR", $PPR);
+foreach ($params as $key => $value) {
+    $stmt->bindValue($key, $value);
+}
 $stmt->execute();
 $diploms = $stmt->fetchall(PDO::FETCH_ASSOC);
 
@@ -18,6 +71,7 @@ if(isset($_POST["supprimer"])) {
     header("Location: diploms.php?PPR=$PPR");
     exit();
 }
+$role = $_COOKIE['role'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,6 +89,7 @@ if(isset($_POST["supprimer"])) {
             --text-dark: #2e3a4d;
             --text-light: #ffffff;
             --border-color: #c5e0ff;
+            --error-red: #ff6b6b;
         }
         
         * {
@@ -233,6 +288,85 @@ if(isset($_POST["supprimer"])) {
                 gap: 8px;
             }
         }
+
+        /* New styles for search and filters */
+        .search-filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+            background-color: var(--secondary-blue);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .filter-box {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .search-box input, .filter-box select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .filter-btn {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-btn:hover {
+            background-color: #4a8bc9;
+        }
+        
+        .reset-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .reset-btn:hover {
+            background-color: #5a6268;
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        @media (max-width: 768px) {
+            .search-filter-container {
+                flex-direction: column;
+            }
+            
+            .filter-actions {
+                width: 100%;
+            }
+            
+            .filter-btn, .reset-btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -242,9 +376,93 @@ if(isset($_POST["supprimer"])) {
             <i class="fas fa-arrow-left"></i> Return Back
         </a>
         
+        <?php if ($role === 'admin'): ?>
         <a href="diploms_add.php?PPR=<?= htmlspecialchars($PPR) ?>" class="add-btn">
             <i class="fas fa-plus-circle"></i> Add Diploma
         </a>
+        <?php endif; ?>
+        
+        <!-- Search and Filter Section -->
+        <form method="GET" action="">
+            <input type="hidden" name="PPR" value="<?= htmlspecialchars($PPR) ?>">
+            
+            <div class="search-filter-container">
+                <div class="search-box">
+                    <label for="search" style="display: block; margin-bottom: 5px; font-weight: 500;">Search by Title:</label>
+                    <input type="text" id="search" name="search" placeholder="Enter diploma title..." 
+                           value="<?= htmlspecialchars($search) ?>">
+                </div>
+                
+                <div class="filter-box">
+                    <label for="level" style="display: block; margin-bottom: 5px; font-weight: 500;">Level:</label>
+                    <select id="level" name="level">
+                        <option value="">All Levels</option>
+                        <?php 
+                        $levels = !empty($filterData['levels']) ? explode(',', $filterData['levels']) : [];
+                        foreach ($levels as $lvl): 
+                        ?>
+                            <option value="<?= htmlspecialchars($lvl) ?>" <?= $level === $lvl ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($lvl) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="filter-box">
+                    <label for="institution" style="display: block; margin-bottom: 5px; font-weight: 500;">Institution:</label>
+                    <select id="institution" name="institution">
+                        <option value="">All Institutions</option>
+                        <?php 
+                        $institutions = !empty($filterData['institutions']) ? explode(',', $filterData['institutions']) : [];
+                        foreach ($institutions as $inst): 
+                        ?>
+                            <option value="<?= htmlspecialchars($inst) ?>" <?= $institution === $inst ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($inst) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="filter-box">
+                    <label for="year" style="display: block; margin-bottom: 5px; font-weight: 500;">Year:</label>
+                    <select id="year" name="year">
+                        <option value="">All Years</option>
+                        <?php 
+                        $years = !empty($filterData['years']) ? explode(',', $filterData['years']) : [];
+                        foreach ($years as $yr): 
+                        ?>
+                            <option value="<?= htmlspecialchars($yr) ?>" <?= $year === $yr ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($yr) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="filter-box">
+                    <label for="type" style="display: block; margin-bottom: 5px; font-weight: 500;">Type:</label>
+                    <select id="type" name="type">
+                        <option value="">All Types</option>
+                        <?php 
+                        $types = !empty($filterData['types']) ? explode(',', $filterData['types']) : [];
+                        foreach ($types as $typ): 
+                        ?>
+                            <option value="<?= htmlspecialchars($typ) ?>" <?= $type === $typ ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($typ) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="filter-actions">
+                    <button type="submit" class="filter-btn">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                    <a href="diploms.php?PPR=<?= htmlspecialchars($PPR) ?>" class="reset-btn">
+                        <i class="fas fa-sync-alt"></i> Reset
+                    </a>
+                </div>
+            </div>
+        </form>
         
         <table>
             <thead>
@@ -255,31 +473,43 @@ if(isset($_POST["supprimer"])) {
                     <th><i class="fas fa-university"></i> Institution</th>
                     <th><i class="fas fa-calendar-alt"></i> Year</th>
                     <th><i class="fas fa-tag"></i> Type</th>
-                    <th><i class="fas fa-cog"></i> Actions</th>
+                    <?php if ($role === 'admin'): ?>
+                    <th><i class="fas fa-cog"></i> Actions</th>    
+                    <?php endif; ?>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach($diploms as $diplom): ?>
+                <?php if (empty($diploms)): ?>
                     <tr>
-                        <td><?= htmlspecialchars($diplom["id"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["Lib"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["niveau"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["etablissement"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["annee"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["type"]) ?></td>
-                        <td class="action-cell">
-                            <a href="diploms_edit.php?ID=<?= htmlspecialchars($diplom["id"]) ?>" class="action-btn edit-btn">
-                                <i class="fas fa-edit"></i> Edit
-                            </a>
-                            <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this diploma?');">
-                                <input type="hidden" name="id" value="<?= htmlspecialchars($diplom["id"]) ?>">
-                                <button type="submit" name="supprimer" class="delete-btn">
-                                    <i class="fas fa-trash-alt"></i> Delete
-                                </button>
-                            </form>
+                        <td colspan="<?= $role === 'admin' ? 7 : 6 ?>" style="text-align: center;">
+                            No diplomas found matching your criteria.
                         </td>
                     </tr>
-                <?php endforeach; ?>
+                <?php else: ?>
+                    <?php foreach($diploms as $diplom): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($diplom["id"]) ?></td>
+                            <td><?= htmlspecialchars($diplom["Lib"]) ?></td>
+                            <td><?= htmlspecialchars($diplom["niveau"]) ?></td>
+                            <td><?= htmlspecialchars($diplom["etablissement"]) ?></td>
+                            <td><?= htmlspecialchars($diplom["annee"]) ?></td>
+                            <td><?= htmlspecialchars($diplom["type"]) ?></td>
+                            <?php if ($role === 'admin'): ?>
+                            <td class="action-cell">
+                                <a href="diploms_edit.php?ID=<?= htmlspecialchars($diplom["id"]) ?>" class="action-btn edit-btn">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this diploma?');">
+                                    <input type="hidden" name="id" value="<?= htmlspecialchars($diplom["id"]) ?>">
+                                    <button type="submit" name="supprimer" class="delete-btn">
+                                        <i class="fas fa-trash-alt"></i> Delete
+                                    </button>
+                                </form>
+                            </td>
+                            <?php endif; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>

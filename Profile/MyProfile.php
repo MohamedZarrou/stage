@@ -81,6 +81,10 @@ if ($userImg && $userImg['img_profile']) {
     $mime = htmlspecialchars($userImg['mime_type2']);
     $imageSrc = "data:$mime;base64,$base64";
 }
+$nom = $_COOKIE['nom'] ?? 'Unknown';
+$prenom = $_COOKIE['prenom'] ?? 'User';
+
+$fullName = htmlspecialchars("$prenom $nom");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -178,6 +182,13 @@ if ($userImg && $userImg['img_profile']) {
             margin-bottom: 20px;
         }
         
+        .profile-avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
         .form-group {
             margin-bottom: 25px;
         }
@@ -253,6 +264,7 @@ if ($userImg && $userImg['img_profile']) {
             border: none;
             width: 100%;
             justify-content: center;
+            text-decoration: none;
         }
         
         .btn-primary {
@@ -282,6 +294,13 @@ if ($userImg && $userImg['img_profile']) {
                 font-size: 24px;
             }
         }
+        
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -302,12 +321,12 @@ if ($userImg && $userImg['img_profile']) {
         
         <form method="POST" enctype="multipart/form-data">
             <div class="profile-image-container">
-                <label>Current Profile Image</label>
+                <label>Profile Image</label>
                 <?php if ($imageSrc): ?>
                     <img src="<?php echo $imageSrc; ?>" alt="Profile Image" class="profile-image"/>
                 <?php else: ?>
-                    <div class="profile-image" style="background-color: var(--light-bg); display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-user" style="font-size: 3rem; color: var(--primary-blue);"></i>
+                    <div class="profile-image">
+                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($fullName) ?>&background=5b9bd5&color=fff&size=150" class="profile-avatar" alt="<?= $fullName ?>">
                     </div>
                 <?php endif; ?>
                 
@@ -337,9 +356,14 @@ if ($userImg && $userImg['img_profile']) {
                 <input type="password" name="password_confirm" id="password_confirm" />
             </div>
             
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Update Profile
-            </button>
+            <div class="btn-group">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Update Profile
+                </button>
+                <a href="javascript:history.back()" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> Return to Dashboard
+                </a>
+            </div>
         </form>
     </div>
 
@@ -354,7 +378,17 @@ if ($userImg && $userImg['img_profile']) {
             if (e.target.files && e.target.files[0]) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    document.querySelector('.profile-image').src = event.target.result;
+                    const profileImage = document.querySelector('.profile-image');
+                    if (profileImage.tagName === 'IMG') {
+                        profileImage.src = event.target.result;
+                    } else {
+                        // If it's the div container with avatar, replace it with an img
+                        const newImg = document.createElement('img');
+                        newImg.src = event.target.result;
+                        newImg.className = 'profile-image';
+                        newImg.alt = 'Profile Image';
+                        profileImage.replaceWith(newImg);
+                    }
                 };
                 reader.readAsDataURL(e.target.files[0]);
             }

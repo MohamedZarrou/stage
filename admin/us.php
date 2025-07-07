@@ -29,6 +29,7 @@ $stmt = $db->prepare($sql);
 $stmt->bindParam(":ppr", $PPR);
 $stmt->execute();
 $us = $stmt->fetch(PDO::FETCH_ASSOC);
+$role = $_COOKIE['role'];
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -217,14 +218,16 @@ $us = $stmt->fetch(PDO::FETCH_ASSOC);
             
             <div class="buttons">
                 <a href="javascript:history.back()" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Retour
+                    <i class="fas fa-arrow-left"></i> Return
                 </a>
+                    <?php if ($role === 'admin'): ?>
                 <button type="button" id="editBtn" class="btn btn-secondary">
-                    <i class="fas fa-edit"></i> Modifier
+                    <i class="fas fa-edit"></i> Edit
                 </button>
                 <button type="submit" name="save" id="saveBtn" class="btn btn-primary" style="display:none;">
-                    <i class="fas fa-save"></i> Enregistrer
+                    <i class="fas fa-save"></i> Save
                 </button>
+                <?php endif; ?>
             </div>
         </form>
     </div>

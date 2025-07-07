@@ -1,35 +1,83 @@
 <?php
-ob_start(); // Start output buffering at the very beginning
-
+ob_start();
+session_start();
 include "sql/db.php";
 
-// Handle form submissions first
+// Check if user is admin safely
+$isAdmin = isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin';
+$currentUserPPR = $_COOKIE['PPR'] ?? null;
+
+// Handle form submissions
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $PPR = isset($_GET["PPR"]) ? $_GET["PPR"] : '';
+    $PPR = $_GET["PPR"] ?? '';
     
-    if(isset($_POST["detail"])){
-        header("location:admin/details.php?PPR=$PPR");
-        ob_end_flush();
+    if(isset($_POST["detail"])) {
+        header("Location: admin/details.php?PPR=".urlencode($PPR));
         exit();
     }
-    if(isset($_POST["us"])){
-        header("location:admin/us.php?PPR={$PPR}");
-        ob_end_flush();
+    elseif(isset($_POST["us"])) {
+        header("Location: admin/us.php?PPR=".urlencode($PPR));
         exit();
     }
-    if(isset($_POST["diploms"])){
-        header("location:admin/diploms.php?PPR={$PPR}");
-        ob_end_flush();
+    elseif(isset($_POST["diploms"])) {
+        header("Location: admin/diploms.php?PPR=".urlencode($PPR));
         exit();
     }
-    if(isset($_POST["historique"])){
-        header("location:admin/historique.php?PPR={$PPR}");
-        ob_end_flush();
+    elseif(isset($_POST["historique"])) {
+        header("Location: admin/historique.php?PPR=".urlencode($PPR));
         exit();
+    }
+    elseif($isAdmin && isset($_POST["delete_employee"])) {
+        try {
+            $deletePPR = $_POST["delete_employee"];
+            
+            // Prevent self-deletion
+            if($currentUserPPR && $deletePPR == $currentUserPPR) {
+                header("Location: ".$_SERVER['PHP_SELF']."?PPR=".$PPR."&error=self_delete");
+                exit();
+            }
+            
+            // Start transaction for atomic operations
+            $db = Database::getInstance()->getConnection();
+            $db->beginTransaction();
+            
+            // Delete all related records
+            $tables = [
+                'diplome', 
+                'hist_affectation', 
+                'us', 
+                'reclamations',
+                'forum_posts',
+                'forum_comments',
+                'utilisateurs'
+            ];
+            
+            foreach ($tables as $table) {
+                $stmt = $db->prepare("DELETE FROM $table WHERE PPR = ?");
+                $stmt->execute([$deletePPR]);
+            }
+            
+            $db->commit();
+            
+            header("Location: dash.php?deleted=1");
+            exit();
+            
+        } catch(PDOException $e) {
+            // Rollback on error
+            if(isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
+            error_log("Delete error: ".$e->getMessage());
+            header("Location: ".$_SERVER['PHP_SELF']."?PPR=".$PPR."&error=1");
+            exit();
+        }
     }
 }
 
-$PPR = isset($_GET["PPR"]) ? $_GET["PPR"] : '';
+$PPR = $_GET["PPR"] ?? '';
+$success = isset($_GET['deleted']);
+$error = $_GET['error'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -39,6 +87,29 @@ $PPR = isset($_GET["PPR"]) ? $_GET["PPR"] : '';
     <title>Employee Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
         :root {
             --primary-blue: #5b9bd5;
             --secondary-blue: #9dc3e6;
@@ -161,18 +232,84 @@ $PPR = isset($_GET["PPR"]) ? $_GET["PPR"] : '';
             .nav-button {
                 width: 100%;
             }
+        } .delete-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            min-width: 150px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .delete-button:hover {
+            background-color: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+        }
+        
+        .confirmation-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .confirmation-box {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+        
+        .confirmation-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
+    <body>
     <div class="dashboard-container">
-        <h1><i class="fas fa-tachometer-alt"></i> Employee Dashboard</h1>
+            <h1><i class="fas fa-tachometer-alt"></i> Employee Dashboard</h1>
         
         <?php if($PPR): ?>
         <div class="user-info">
             <i class="fas fa-user-tie"></i>
             <p>Currently viewing employee with PPR: <strong><?php echo htmlspecialchars($PPR); ?></strong></p>
         </div>
+        <?php endif; ?>
+
+        <?php if($success): ?>
+            <div class="alert alert-success">
+                Employee and all related records deleted successfully!
+            </div>
+        <?php elseif($error === '1'): ?>
+            <div class="alert alert-danger">
+                Error deleting employee. Please try again.
+            </div>
+        <?php elseif($error === 'self_delete'): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> Security restriction: You cannot delete your own profile!
+            </div>
         <?php endif; ?>
         
         <form action="" method="POST">
@@ -187,14 +324,35 @@ $PPR = isset($_GET["PPR"]) ? $_GET["PPR"] : '';
                     <i class="fas fa-briefcase"></i> Work History
                 </button>
                 <button type="submit" name="us" class="nav-button">
-                    <i class="fas fa-cog"></i> Us
+                    <i class="fas fa-cog"></i> Unity
                 </button>
+                
+                <?php if($isAdmin && $PPR): ?>
+                <button type="button" id="deleteBtn" class="delete-button">
+                    <i class="fas fa-trash-alt"></i> Delete Employee
+                </button>
+                <?php endif; ?>
             </div>
         </form>
         
+        <!-- Confirmation Dialog -->
+        <div id="confirmationDialog" class="confirmation-dialog">
+            <div class="confirmation-box">
+                <h3>Confirm Deletion</h3>
+                <p>Are you sure you want to delete this employee? This action cannot be undone.</p>
+                <div class="confirmation-buttons">
+                    <form action="" method="POST" style="display: inline;">
+                        <input type="hidden" name="delete_employee" value="<?php echo $PPR; ?>">
+                        <button type="submit" class="delete-button">Confirm Delete</button>
+                    </form>
+                    <button id="cancelDelete" class="nav-button">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
         <div class="button-container">
             <a href="dash.php" class="nav-button return-button">
-                <i class="fas fa-arrow-left"></i> Retour
+                <i class="fas fa-arrow-left"></i> Return
             </a>
         </div>
         
@@ -203,27 +361,19 @@ $PPR = isset($_GET["PPR"]) ? $_GET["PPR"] : '';
             <p>Employee Management System <?php echo date('Y'); ?></p>
         </div>
     </div>
+
+    <script>
+        // Handle delete confirmation
+        document.getElementById('deleteBtn')?.addEventListener('click', function() {
+            document.getElementById('confirmationDialog').style.display = 'flex';
+        });
+        
+        document.getElementById('cancelDelete')?.addEventListener('click', function() {
+            document.getElementById('confirmationDialog').style.display = 'none';
+        });
+    </script>
 </body>
 </html>
 <?php
 ob_end_flush(); // Send the output buffer
-?>
-</html>
-<?php 
-if(isset($_POST["detail"])){
-    header("location:admin/details.php?PPR=$PPR");
-    exit();
-}
-if(isset($_POST["us"])){
-    header("location:admin/us.php?PPR={$PPR}");
-    exit();
-}
-if(isset($_POST["diploms"])){
-    header("location:admin/diploms.php?PPR={$PPR}");
-    exit();
-}
-if(isset($_POST["historique"])){
-    header("location:admin/historique.php?PPR={$PPR}");
-    exit();
-}
 ?>

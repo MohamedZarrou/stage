@@ -1,34 +1,90 @@
-<?php 
+<?php
 include "sql/db.php";
-
 $db = Database::getInstance()->getConnection();
 
-// Fetch all diplômes
-$sql = "SELECT * FROM diplome";
-$stmt = $db->prepare($sql);
-$stmt->execute();
-$diploms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Handle filtering
+$filter_lib = $_GET['filter_lib'] ?? '';
+$filter_type = $_GET['filter_type'] ?? '';
+$filter_niveau = $_GET['filter_niveau'] ?? '';
 
-// Handle delete
-if (isset($_POST["supprimer"])) {
-    $id = $_POST["id"];
-    $sql1 = "DELETE FROM diplome WHERE id = :ID";
-    $stmt1 = $db->prepare($sql1);
-    $stmt1->bindParam(":ID", $id);
-    $stmt1->execute();
-    
-    // Refresh the page to reflect changes
-    header("Location: " . $_SERVER['REQUEST_URI']);
-    exit();
+// Handle delete action
+if (isset($_GET['delete_id'])) {
+    $id_to_delete = $_GET['delete_id'];
+    $stmt = $db->prepare("DELETE FROM diplome WHERE id = ?");
+    $stmt->execute([$id_to_delete]);
+    header("Location: ?");
+    exit;
 }
+
+// Check if we're viewing employees with a specific diploma
+$view_employees = isset($_GET['view_employees']);
+$current_diplome_id = $_GET['id'] ?? null;
+
+// Build the base query for diplomas
+$sql = "SELECT * FROM diplome WHERE 1=1";
+$params = [];
+
+if (!empty($filter_lib)) {
+    $sql .= " AND Lib LIKE :lib";
+    $params[':lib'] = "%$filter_lib%";
+}
+
+if (!empty($filter_type)) {
+    $sql .= " AND type = :type";
+    $params[':type'] = $filter_type;
+}
+
+if (!empty($filter_niveau)) {
+    $sql .= " AND niveau = :niveau";
+    $params[':niveau'] = $filter_niveau;
+}
+
+$sql .= " ORDER BY Lib";
+
+$stmt = $db->prepare($sql);
+foreach ($params as $key => $value) {
+    $stmt->bindValue($key, $value);
+}
+$stmt->execute();
+$diplomes_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get distinct values for filter dropdowns
+$types = $db->query("SELECT DISTINCT type FROM diplome ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+$niveaux = $db->query("SELECT DISTINCT niveau FROM diplome ORDER BY niveau")->fetchAll(PDO::FETCH_COLUMN);
+
+// If viewing employees, get the diploma info and its employees
+$current_diplome = null;
+$employees = [];
+if ($view_employees && $current_diplome_id) {
+    // Get the current diploma info
+    $stmt = $db->prepare("SELECT * FROM diplome WHERE id = ?");
+    $stmt->execute([$current_diplome_id]);
+    $current_diplome = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Get employees with this diploma
+    $stmt = $db->prepare("
+        SELECT u.* 
+        FROM utilisateurs u
+        JOIN diplome d ON u.PPR = d.PPR
+        WHERE d.PPR = ?
+        ORDER BY u.nom, u.prenom
+    ");
+    $stmt->execute([$current_diplome_id]);
+    $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+   
+
+}
+ $role = $_COOKIE['role'];
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Liste des Diplômes</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Diplômes</title>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --primary-blue: #5b9bd5;
@@ -38,224 +94,442 @@ if (isset($_POST["supprimer"])) {
             --text-dark: #2e3a4d;
             --text-light: #ffffff;
             --border-color: #c5e0ff;
-            --error-red: #ff6b6b;
+            --error-color: #e74c3c;
+            --success-color: #2ecc71;
         }
-
+        
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
+        
         body {
             background-color: var(--light-bg);
-            padding: 30px;
             color: var(--text-dark);
-            min-height: 100vh;
+            line-height: 1.6;
+            padding: 20px;
         }
-
+        
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background-color: var(--table-bg);
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-            padding: 30px;
-            border: 1px solid var(--border-color);
         }
-
-        h2 {
+        
+        h1 {
             color: var(--primary-blue);
-            margin-bottom: 25px;
+            margin-bottom: 30px;
             text-align: center;
             font-size: 28px;
-            font-weight: 600;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
         }
-
-        a.add-btn {
+        
+        /* Filter Section */
+        .filter-section {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+        
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus,
+        select:focus {
+            border-color: var(--primary-blue);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(91, 155, 213, 0.2);
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .back-button {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background-color: var(--primary-blue);
-            color: var(--text-light);
+            margin-bottom: 20px;
+            color: var(--primary-blue);
             text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            margin-bottom: 25px;
             font-weight: 500;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            user-select: none;
         }
-
-        a.add-btn:hover {
-            background-color: #4a8bc9;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(91, 155, 213, 0.3);
+        
+        .back-button:hover {
+            text-decoration: underline;
         }
-
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-            margin-top: 10px;
+        
+        /* Diplomas Cards Grid */
+        .diplomes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
         }
-
-        th, td {
-            padding: 14px 16px;
-            text-align: center;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            background-color: var(--primary-blue);
-            color: var(--text-light);
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        tr {
+        
+        .diplome-card {
             background-color: var(--table-bg);
-            transition: all 0.2s ease;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-
-        tr:nth-child(even) {
-            background-color: #f8fbff;
+        
+        .diplome-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
         }
-
-        tr:hover {
-            background-color: #e6f2ff;
+        
+        .diplome-card h3 {
+            color: var(--primary-blue);
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
         }
-
-        .action-cell {
+        
+        .diplome-info {
+            margin-bottom: 15px;
+        }
+        
+        .diplome-info p {
+            margin-bottom: 8px;
             display: flex;
-            gap: 10px;
-            justify-content: center;
         }
-
-        .action-btn {
+        
+        .diplome-info strong {
+            min-width: 120px;
+            display: inline-block;
+        }
+        
+        .btn {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
+            gap: 8px;
+            padding: 10px 15px;
             border-radius: 6px;
             font-size: 14px;
             font-weight: 500;
-            transition: all 0.2s ease;
-            text-decoration: none;
             cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
             border: none;
         }
-
-        .modifier-btn {
+        
+        .btn-primary {
+            background-color: var(--primary-blue);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #4a8bc9;
+        }
+        
+        .btn-secondary {
             background-color: var(--secondary-blue);
             color: var(--text-dark);
         }
-
-        .modifier-btn:hover {
+        
+        .btn-secondary:hover {
             background-color: #8ab5e0;
         }
-
-        .supprimer-btn {
-            background-color: var(--error-red);
+        
+        .btn-danger {
+            background-color: var(--error-color);
             color: white;
-            border-radius: 6px;
-            padding: 8px 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border: none;
         }
-
-        .supprimer-btn:hover {
-            background-color: #ff5252;
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
         }
-
-        form.delete-form {
-            display: inline;
+        
+        .btn-warning {
+            background-color: #f39c12;
+            color: white;
         }
-
+        
+        .btn-warning:hover {
+            background-color: #d35400;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        /* Employees List */
+        .employees-section {
+            margin-top: 40px;
+            background-color: var(--table-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .employees-list {
+            margin-top: 20px;
+        }
+        
+        .employee-card {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .employee-card:last-child {
+            border-bottom: none;
+        }
+        
+        .employee-photo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--light-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            overflow: hidden;
+        }
+        
+        .employee-photo i {
+            font-size: 20px;
+            color: var(--primary-blue);
+        }
+        
+        .employee-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .employee-info {
+            flex: 1;
+        }
+        
+        .employee-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .employee-position {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .no-employees, .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        
         @media (max-width: 768px) {
-            body {
-                padding: 15px;
+            .diplomes-grid {
+                grid-template-columns: 1fr;
             }
-
-            .container {
-                padding: 20px;
-            }
-
-            table {
-                display: block;
-                overflow-x: auto;
-            }
-
-            th, td {
-                padding: 10px 12px;
-                font-size: 0.9rem;
-            }
-
-            .action-cell {
+            
+            .action-buttons {
                 flex-direction: column;
-                gap: 8px;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2><i class="fas fa-graduation-cap"></i> Liste des Diplômes</h2>
-
-        <a href="admin/diploms_add.php" class="add-btn">
-            <i class="fas fa-plus-circle"></i> Ajouter un Diplôme
+        <h1>
+            <i class="fas fa-graduation-cap"></i>
+            <?= $view_employees ? "Employés avec ce Diplôme" : "Gestion des Diplômes" ?>
+        </h1>
+        <a href="dash.php" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour au dashboard
         </a>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>PPR</th>
-                    <th>Libellé</th>
-                    <th>Niveau</th>
-                    <th>Établissement</th>
-                    <th>Année</th>
-                    <th>Type</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($diploms as $diplom): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($diplom["id"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["PPR"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["Lib"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["niveau"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["etablissement"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["annee"]) ?></td>
-                        <td><?= htmlspecialchars($diplom["type"]) ?></td>
-                        <td class="action-cell">
-                            <a href="admin/diploms_edit.php?ID=<?= htmlspecialchars($diplom["id"]) ?>" class="action-btn modifier-btn">
-                                <i class="fas fa-edit"></i> Modifier
-                            </a>
-                            <form method="POST" class="delete-form" onsubmit="return confirm('Supprimer ce diplôme ?');">
-                                <input type="hidden" name="id" value="<?= htmlspecialchars($diplom["id"]) ?>">
-                                <button type="submit" name="supprimer" class="supprimer-btn">
-                                    <i class="fas fa-trash-alt"></i> Supprimer
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        
+        <?php if ($view_employees && $current_diplome): ?>
+            <!-- Back button when viewing employees -->
+            <a href="?" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour à la liste des diplômes
+            </a>
+            
+            <br><br>
+            <!-- Current Diploma Info -->
+            <div class="diplome-card">
+                <h3><?= htmlspecialchars($current_diplome['Lib']) ?></h3>
+                <div class="diplome-info">
+                    <p><strong>Type:</strong> <?= htmlspecialchars($current_diplome['type']) ?></p>
+                    <p><strong>Niveau:</strong> <?= htmlspecialchars($current_diplome['niveau']) ?></p>
+                    <p><strong>Etablissement:</strong> <?= htmlspecialchars($current_diplome['etablissement']) ?></p>
+                </div>
+                <div class="action-buttons">
+                     <?php if ($role === 'admin'): ?>
+                    <a href="admin/diploms_edit.php?ID=<?= urlencode($current_diplome['id']) ?>" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> Modifier
+                    </a>
+                    <a href="?delete_id=<?= urlencode($current_diplome['id']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce diplôme?')">
+                        <i class="fas fa-trash"></i> Supprimer
+                    </a>
+                    <?php endif; ?>
+
+                </div>
+            </div>
+            
+            <!-- Employees List -->
+            <div class="employees-section">
+                <h2><i class="fas fa-users"></i> Employés possédant ce diplôme</h2>
+                
+                <?php if (count($employees) > 0): ?>
+                    <div class="employees-list">
+                        <?php foreach ($employees as $employee): ?>
+                            <div class="employee-card">
+                                <div class="employee-photo">
+                                    <?php if (!empty($employee['img_profile'])): ?>
+                                        <img src="data:<?= htmlspecialchars($employee['mime_type']) ?>;base64,<?= base64_encode($employee['img_profile']) ?>" alt="Photo de profil">
+                                    <?php else: ?>
+                                        <i class="fas fa-user"></i>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="employee-info">
+                                    <div class="employee-name">
+                                        <?= htmlspecialchars($employee['prenom']) ?> <?= htmlspecialchars($employee['nom']) ?>
+                                    </div>
+                                    <div class="employee-position">
+                                        <?= htmlspecialchars($employee['fonction']) ?> - <?= htmlspecialchars($employee['grade']) ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="no-employees">
+                        <i class="fas fa-info-circle"></i> Aucun employé trouvé avec ce diplôme
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+        <?php else: ?>
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <form method="GET" action="">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filter_lib">Libellé</label>
+                            <input type="text" id="filter_lib" name="filter_lib" value="<?= htmlspecialchars($filter_lib) ?>" placeholder="Rechercher par libellé">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="filter_type">Type</label>
+                            <select id="filter_type" name="filter_type">
+                                <option value="">Tous les types</option>
+                                <?php foreach ($types as $type): ?>
+                                    <option value="<?= htmlspecialchars($type) ?>" <?= $filter_type === $type ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($type) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="filter_niveau">Niveau</label>
+                            <select id="filter_niveau" name="filter_niveau">
+                                <option value="">Tous les niveaux</option>
+                                <?php foreach ($niveaux as $niveau): ?>
+                                    <option value="<?= htmlspecialchars($niveau) ?>" <?= $filter_niveau === $niveau ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($niveau) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                        <a href="?" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Réinitialiser
+                        </a>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Main Diplomas Listing -->
+            <?php if (count($diplomes_list) > 0): ?>
+                <div class="diplomes-grid">
+                    <?php foreach ($diplomes_list as $diplome): ?>
+                        <div class="diplome-card">
+                            <h3><?= htmlspecialchars($diplome['Lib']) ?></h3>
+                            <div class="diplome-info">
+                                <p><strong>Type:</strong> <?= htmlspecialchars($diplome['type']) ?></p>
+                                <p><strong>Niveau:</strong> <?= htmlspecialchars($diplome['niveau']) ?></p>
+                                <p><strong>Etablissement:</strong> <?= htmlspecialchars($diplome['etablissement']) ?></p>
+                            </div>
+                            <div class="action-buttons">
+                                <a href="?view_employees=true&id=<?= urlencode($diplome['id']) ?>" class="btn btn-primary">
+                                    <i class="fas fa-users"></i> Employés
+                                </a>
+                                                               <?php if ($role === 'admin'): ?>
+
+                                <a href="admin/diploms_edit.php?ID=<?= urlencode($diplome['id']) ?>" class="btn btn-warning">
+                                    <i class="fas fa-edit"></i> Modifier
+                                </a>
+                                <a href="?delete_id=<?= urlencode($diplome['id']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce diplôme?')">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </a>
+                                <?php endif; ?>
+
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="no-results">
+                    <i class="fas fa-info-circle"></i> Aucun diplôme trouvé avec les critères sélectionnés
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
     </div>
 </body>
 </html>

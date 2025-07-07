@@ -9,7 +9,7 @@ if (isset($_POST['signup'])) {
     
     // Check if employee exists
     $db = Database::getInstance()->getConnection();
-    $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE Cin = :Cin" );
+    $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE Cin = :Cin");
     $stmt->bindParam(":Cin", $Cin);
     $stmt->execute();
     $employee = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -21,16 +21,17 @@ if (isset($_POST['signup'])) {
         $email = $_POST['email'];
         $password = $_POST['password'];
         
-        // Check if email already exists
-        $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE email = :email");
+        // Check if email exists for a different CIN
+        $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE email = :email AND Cin != :Cin");
         $stmt->bindParam(":email", $email);
+        $stmt->bindParam(":Cin", $Cin);
         $stmt->execute();
         
         if ($stmt->fetch()) {
-            $error = "Email already registered. Please use another email or login.";
+            $error = "Email already registered with a different employee. Please use another email.";
         } else {
             // Update the employee record with email and password
-            $hash=password_hash($password,PASSWORD_DEFAULT);
+            $hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $db->prepare("UPDATE utilisateurs SET email = :email, password = :password WHERE PPR = :ppr");
             $stmt->bindParam(":email", $email);
             $stmt->bindParam(":password", $hash);
@@ -272,12 +273,10 @@ if (isset($_POST['signup'])) {
                 <?php endif; ?>
                 
                 <form action="" method="POST">
-                    <div class="name-fields">
-                        <div class="form-group">
-                            <label for="Cin"> Cin</label>
-                            <i class="fas fa-user input-icon"></i>
-                            <input type="text" id="Cin" name="Cin" class="form-control" placeholder="Enter CIN" required>
-                        </div>
+                    <div class="form-group">
+                        <label for="Cin">CIN</label>
+                        <i class="fas fa-id-card input-icon"></i>
+                        <input type="text" id="Cin" name="Cin" class="form-control" placeholder="Enter your CIN" required>
                     </div>
                     
                     <div class="form-group">

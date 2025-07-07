@@ -1,54 +1,120 @@
 <?php 
+// Enable error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 include "../sql/db.php";
 $db = Database::getInstance()->getConnection();
 
 $success_message = '';
 $error_message = '';
 
+// Initialize variables to keep form values after submit
+$nom = $prenom = $Cin = $d_naiss = $d_recrutement = '';
+$sit_familliale = $genre = $role = '';
+$email = $fonction = $grade = '';
+
 if(isset($_POST["save"])) {
+    // Preserve posted values to refill form in case of error
+    $nom = $_POST["nom"] ?? '';
+    $prenom = $_POST["prenom"] ?? '';
+    $Cin = $_POST["Cin"] ?? '';
+    $d_naiss = $_POST["d_naiss"] ?? '';
+    $d_recrutement = $_POST["d_recrutement"] ?? '';
+    $sit_familliale = $_POST["sit_familliale"] ?? '';
+    $genre = $_POST["genre"] ?? '';
+    $role = $_POST["role"] ?? '';
+    $email = $_POST["email"] ?? '';
+    $fonction = $_POST["fonction"] ?? '';
+    $grade = $_POST["grade"] ?? '';
+
     try {
-        // Handle file upload
+        // Initialize image variables
         $imgData = null;
         $mimeType = null;
         
-        if(isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-            // Check if the file is an image
-            $fileInfo = getimagesize($_FILES['photo']['tmp_name']);
-            if($fileInfo !== false) {
-                $imgData = file_get_contents($_FILES['photo']['tmp_name']);
-                $mimeType = $_FILES['photo']['type'];
-            } else {
-                throw new Exception("Le fichier téléchargé n'est pas une image valide.");
+        // Handle file upload
+        if(isset($_FILES['photo'])) {
+            switch ($_FILES['photo']['error']) {
+                case UPLOAD_ERR_OK:
+                    // Check file size (limit to 5MB)
+                    $maxFileSize = 5 * 1024 * 1024;
+                    if ($_FILES['photo']['size'] > $maxFileSize) {
+                        throw new Exception("File size exceeds maximum limit of 5MB.");
+                    }
+                    
+                    // Verify the file is an image
+                    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                    $detectedType = mime_content_type($_FILES['photo']['tmp_name']);
+                    
+                    if(!in_array($detectedType, $allowedTypes)) {
+                        throw new Exception("Only JPG, PNG, and GIF files are allowed.");
+                    }
+                    
+                    // Get image data
+                    $imgData = file_get_contents($_FILES['photo']['tmp_name']);
+                    if($imgData === false) {
+                        throw new Exception("Failed to read image file.");
+                    }
+                    $mimeType = $detectedType;
+                    break;
+                
+                case UPLOAD_ERR_NO_FILE:
+                    // Image required — throw error to prevent saving
+                    throw new Exception("Please upload a photo (JPG, PNG, or GIF).");
+                    break;
+                
+                default:
+                    $uploadErrors = [
+                        UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize directive in php.ini',
+                        UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE in form',
+                        UPLOAD_ERR_PARTIAL => 'File only partially uploaded',
+                        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+                        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+                        UPLOAD_ERR_EXTENSION => 'PHP extension stopped the file upload'
+                    ];
+                    throw new Exception($uploadErrors[$_FILES['photo']['error']] ?? 'Unknown upload error');
             }
+        } else {
+            throw new Exception("Photo upload is required.");
         }
 
+        // Prepare SQL query
         $sql = "INSERT INTO utilisateurs 
-                (nom, prenom, Cin, d_naiss, d_recrutement, sit_familliale, genre, role, email, fonction, grade, img_profile, mime_type) 
+                (nom, prenom, Cin, d_naiss, d_recrutement, sit_familliale, genre, role, email, fonction, grade, img, mime_type) 
                 VALUES 
                 (:nom, :prenom, :Cin, :d_naiss, :d_recrutement, :sit_familiale, :genre, :role, :email, :fonction, :grade, :img, :mime)";
         
         $stmt = $db->prepare($sql);
-        $stmt->bindparam(":nom", $_POST["nom"]);
-        $stmt->bindparam(":prenom", $_POST["prenom"]);
-        $stmt->bindparam(":Cin", $_POST["Cin"]);
-        $stmt->bindparam(":d_naiss", $_POST["d_naiss"]);
-        $stmt->bindparam(":d_recrutement", $_POST["d_recrutement"]);
-        $stmt->bindparam(":sit_familiale", $_POST["sit_familliale"]);
-        $stmt->bindparam(":genre", $_POST["genre"]);
-        $stmt->bindparam(":role", $_POST["role"]);
-        $stmt->bindparam(":email", $_POST["email"]);
-        $stmt->bindparam(":fonction", $_POST["fonction"]);
-        $stmt->bindparam(":grade", $_POST["grade"]);
-        $stmt->bindparam(":img", $imgData, PDO::PARAM_LOB);
-        $stmt->bindparam(":mime", $mimeType);
         
+        // Bind parameters
+        $stmt->bindParam(":nom", $nom);
+        $stmt->bindParam(":prenom", $prenom);
+        $stmt->bindParam(":Cin", $Cin);
+        $stmt->bindParam(":d_naiss", $d_naiss);
+        $stmt->bindParam(":d_recrutement", $d_recrutement);
+        $stmt->bindParam(":sit_familiale", $sit_familliale);
+        $stmt->bindParam(":genre", $genre);
+        $stmt->bindParam(":role", $role);
+        $stmt->bindParam(":email", $email);
+        $stmt->bindParam(":fonction", $fonction);
+        $stmt->bindParam(":grade", $grade);
+        $stmt->bindParam(":img", $imgData, PDO::PARAM_LOB);
+        $stmt->bindParam(":mime", $mimeType);
+        
+        // Execute the statement
         if($stmt->execute()) {
-            $success_message = "Utilisateur créé avec succès!";
+            $success_message = "User created successfully!";
+            // Clear form after success
+            $nom = $prenom = $Cin = $d_naiss = $d_recrutement = '';
+            $sit_familliale = $genre = $role = '';
+            $email = $fonction = $grade = '';
         } else {
-            $error_message = "Erreur lors de la création de l'utilisateur.";
+            $errorInfo = $stmt->errorInfo();
+            throw new Exception("Database error: " . $errorInfo[2]);
         }
     } catch (Exception $e) {
-        $error_message = "Erreur: " . $e->getMessage();
+        $error_message = "Error: " . $e->getMessage();
     }
 }
 ?>
@@ -56,10 +122,13 @@ if(isset($_POST["save"])) {
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nouveau Utilisateur</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New User</title>
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
     <style>
         :root {
             --primary-blue: #5b9bd5;
@@ -277,109 +346,120 @@ if(isset($_POST["save"])) {
 </head>
 <body>
     <div class="form-container">
-        <h2><i class="fas fa-user-plus"></i> Nouveau Utilisateur</h2>
-        
+        <h2><i class="fas fa-user-plus"></i> New User</h2>
+
         <?php if($success_message): ?>
             <div class="alert alert-success">
                 <?php echo htmlspecialchars($success_message); ?>
             </div>
         <?php endif; ?>
-        
+
         <?php if($error_message): ?>
             <div class="alert alert-error">
                 <?php echo htmlspecialchars($error_message); ?>
             </div>
         <?php endif; ?>
-        
-        <form method="POST" enctype="multipart/form-data">
+
+        <form method="POST" enctype="multipart/form-data" novalidate>
             <div class="photo-upload">
                 <div class="photo-preview" id="photoPreview">
                     <i class="fas fa-user"></i>
-                    <img id="previewImage" style="display: none;">
+                    <img id="previewImage" style="display: none;" alt="Photo Preview" />
                 </div>
-                <button type="button" class="file-upload-btn" onclick="document.getElementById('photoInput').click()">
-                    <i class="fas fa-camera"></i> Choisir une photo
+                <button
+                    type="button"
+                    class="file-upload-btn"
+                    onclick="document.getElementById('photoInput').click()"
+                >
+                    <i class="fas fa-camera"></i> Choose Photo
                 </button>
-                <input type="file" id="photoInput" name="photo" class="file-upload-input" accept="image/*">
+                <input
+                    type="file"
+                    id="photoInput"
+                    name="photo"
+                    class="file-upload-input"
+                    accept="image/jpeg, image/png, image/gif"
+                    required
+                />
             </div>
-            
+
             <div class="form-group">
                 <div class="form-field">
-                    <label for="nom">Nom</label>
-                    <input type="text" name="nom" id="nom" required>
+                    <label for="nom">Last Name</label>
+                    <input type="text" name="nom" id="nom" value="<?php echo htmlspecialchars($nom); ?>" required />
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="prenom">Prénom</label>
-                    <input type="text" id="prenom" name="prenom" required>
+                    <label for="prenom">First Name</label>
+                    <input type="text" id="prenom" name="prenom" value="<?php echo htmlspecialchars($prenom); ?>" required />
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="Cin">CIN</label>
-                    <input type="text" name="Cin" id="Cin" required>
+                    <label for="Cin">ID Number</label>
+                    <input type="text" name="Cin" id="Cin" value="<?php echo htmlspecialchars($Cin); ?>" required />
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="d_naiss">Date de naissance</label>
-                    <input type="date" name="d_naiss" id="d_naiss" required>
+                    <label for="d_naiss">Birth Date</label>
+                    <input type="date" name="d_naiss" id="d_naiss" value="<?php echo htmlspecialchars($d_naiss); ?>" required />
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="d_recrutement">Date de recrutement</label>
-                    <input type="date" name="d_recrutement" id="d_recrutement" required>
+                    <label for="d_recrutement">Hire Date</label>
+                    <input type="date" name="d_recrutement" id="d_recrutement" value="<?php echo htmlspecialchars($d_recrutement); ?>" required />
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="sit_familliale">Situation familiale</label>
+                    <label for="sit_familliale">Marital Status</label>
                     <select name="sit_familliale" id="sit_familliale" required>
-                        <option value="">Sélectionner</option>
-                        <option value="Célibataire">Célibataire</option>
-                        <option value="Marié(e)">Marié(e)</option>
-                        <option value="Divorcé(e)">Divorcé(e)</option>
-                        <option value="Veuf/Veuve">Veuf/Veuve</option>
+                        <option value="">Select</option>
+                        <option value="Single" <?php if($sit_familliale === "Single") echo "selected"; ?>>Single</option>
+                        <option value="Married" <?php if($sit_familliale === "Married") echo "selected"; ?>>Married</option>
+                        <option value="Divorced" <?php if($sit_familliale === "Divorced") echo "selected"; ?>>Divorced</option>
+                        <option value="Widowed" <?php if($sit_familliale === "Widowed") echo "selected"; ?>>Widowed</option>
                     </select>
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="genre">Genre</label>
+                    <label for="genre">Gender</label>
                     <select name="genre" id="genre" required>
-                        <option value="">Sélectionner</option>
-                        <option value="Homme">Homme</option>
-                        <option value="Femme">Femme</option>
+                        <option value="">Select</option>
+                        <option value="Male" <?php if($genre === "Male") echo "selected"; ?>>Male</option>
+                        <option value="Female" <?php if($genre === "Female") echo "selected"; ?>>Female</option>
                     </select>
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="role">Rôle</label>
+                    <label for="role">Role</label>
                     <select name="role" id="role" required>
-                        <option value="">Sélectionner</option>
-                        <option value="Admin">Admin</option>
-                        <option value="User">User</option>
+                        <option value="">Select</option>
+                        <option value="admin" <?php if($role === "admin") echo "selected"; ?>>Admin</option>
+                        <option value="user" <?php if($role === "user") echo "selected"; ?>>User</option>
                     </select>
                 </div>
-                
+
                 <div class="form-field">
                     <label for="email">Email</label>
-                    <input type="email" name="email" id="email" >
+                    <input type="email" name="email" id="email" value="<?php echo htmlspecialchars($email); ?>" />
                 </div>
-                
+
                 <div class="form-field">
-                    <label for="fonction">Fonction</label>
-                    <input type="text" name="fonction" id="fonction" >
+                    <label for="fonction">Position</label>
+                    <input type="text" name="fonction" id="fonction" value="<?php echo htmlspecialchars($fonction); ?>" />
                 </div>
-                
+
                 <div class="form-field">
                     <label for="grade">Grade</label>
-                    <input type="text" name="grade" id="grade" >
+                    <input type="text" name="grade" id="grade" value="<?php echo htmlspecialchars($grade); ?>" />
                 </div>
             </div>
-            
+
             <div class="buttons">
                 <a href="javascript:history.back()" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Retour
+                    <i class="fas fa-arrow-left"></i> Back
                 </a>
                 <button type="submit" name="save" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Enregistrer
+                    <i class="fas fa-save"></i> Save
                 </button>
             </div>
         </form>
@@ -387,21 +467,24 @@ if(isset($_POST["save"])) {
 
     <script>
         // Photo preview functionality
-        document.getElementById('photoInput').addEventListener('change', function(e) {
-            const preview = document.getElementById('photoPreview');
-            const previewImage = document.getElementById('previewImage');
-            const icon = preview.querySelector('i');
-            
+        document.getElementById("photoInput").addEventListener("change", function (e) {
+            const preview = document.getElementById("photoPreview");
+            const previewImage = document.getElementById("previewImage");
+            const icon = preview.querySelector("i");
+
             if (e.target.files && e.target.files[0]) {
                 const reader = new FileReader();
-                
-                reader.onload = function(event) {
+
+                reader.onload = function (event) {
                     previewImage.src = event.target.result;
-                    previewImage.style.display = 'block';
-                    icon.style.display = 'none';
-                }
-                
+                    previewImage.style.display = "block";
+                    icon.style.display = "none";
+                };
+
                 reader.readAsDataURL(e.target.files[0]);
+            } else {
+                previewImage.style.display = "none";
+                icon.style.display = "block";
             }
         });
     </script>

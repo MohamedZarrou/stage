@@ -23,6 +23,7 @@ if(isset($_POST["supprimer"])){
     header("Location: ".$_SERVER['REQUEST_URI']);
     exit();
 }
+$role = $_COOKIE['role'];
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -229,11 +230,13 @@ if(isset($_POST["supprimer"])){
         <h2><i class="fas fa-history"></i> Historique d'Affectation</h2>
         
         <form method="POST" class="text-end">
+                <?php if ($role === 'admin'): ?>
             <button type="submit" name="add" class="add-btn">
-                <i class="fas fa-plus-circle"></i> Ajouter
+                <i class="fas fa-plus-circle"></i> Add
             </button>
+            <?php endif; ?>
              <a class="add-btn" href="../gestion.php?PPR=<?php echo htmlspecialchars($_GET['PPR'] ?? '', ENT_QUOTES); ?>" class="btn btn-secondary">
-             <i class="fas fa-arrow-left"></i> Retour
+             <i class="fas fa-arrow-left"></i> Return
             </a>
 
         </form>
@@ -245,7 +248,7 @@ if(isset($_POST["supprimer"])){
                         <th><i class="fas fa-code"></i> Code US</th>
                         <th><i class="fas fa-calendar-start"></i> Date Début</th>
                         <th><i class="fas fa-calendar-end"></i> Date Fin</th>
-                        <th><i class="fas fa-cog"></i> Actions</th>
+                        <?php if ($role === 'admin'): ?> <th><i class="fas fa-cog"></i> Actions</th><?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -255,22 +258,25 @@ if(isset($_POST["supprimer"])){
                             <td><?= htmlspecialchars($historique["date_debut"]) ?></td>
                             <td><?= htmlspecialchars($historique["date_fin"]) ?></td>
                             <td class="action-cell">
+                                 <?php if ($role === 'admin'): ?>
                                 <a href="historique_edit.php?ID=<?= htmlspecialchars($historique["id"]) ?>" class="action-btn edit-btn">
-                                    <i class="fas fa-edit"></i> Modifier
+                                    <i class="fas fa-edit"></i> Edit
                                 </a>
                                 <form method="POST" class="delete-form" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet élément ?');">
                                     <input type="hidden" name="id" value="<?= htmlspecialchars($historique["id"]) ?>">
                                     <button type="submit" name="supprimer" class="delete-btn">
-                                        <i class="fas fa-trash-alt"></i> Supprimer
+                                        <i class="fas fa-trash-alt"></i> Delete
                                     </button>
                                 </form>
+                                <?php endif; ?>
+
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         <?php else: ?>
-            <div class="alert">Aucun historique trouvé pour ce PPR.</div>
+            <div class="alert">No records found for this PPR</div>
         <?php endif; ?>
     </div>
 </body>

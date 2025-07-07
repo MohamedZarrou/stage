@@ -72,6 +72,7 @@ if ($view_employees && $current_us_ppr) {
     $stmt->execute([$current_us_ppr]);
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+$role = $_COOKIE['role'];
 ?>
 
 <!DOCTYPE html>
@@ -402,25 +403,27 @@ if ($view_employees && $current_us_ppr) {
                 </div>
                 <div class="action-buttons">
                     
-                    <a href="admin/us.php?PPR=<?= urlencode($current_us['PPR']) ?>" class="btn btn-warning">
-                        <i class="fas fa-edit"></i> Modifier
-                    </a>
-                    <a href="?delete_ppr=<?= urlencode($current_us['PPR']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette unité de service?')">
-                        <i class="fas fa-trash"></i> Supprimer
-                    </a>
+                    <?php if ($role === 'admin'): ?>
+    <a href="admin/us.php?PPR=<?= urlencode($us['PPR']) ?>" class="btn btn-warning">
+        <i class="fas fa-edit"></i> Modifier
+    </a>
+    <a href="?delete_ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette unité de service?')">
+        <i class="fas fa-trash"></i> Supprimer
+    </a>
+    <?php endif; ?>
                 </div>
             </div>
             
             <!-- Employees List -->
             <div class="employees-section">
-                <h2><i class="fas fa-users"></i> Employés</h2>
+                <h2><i class="fas fa-users"></i> Employés travaillant dans cette unité </h2>
                 
                 <?php if (count($employees) > 0): ?>
                     <div class="employees-list">
                         <?php foreach ($employees as $employee): ?>
                             <div class="employee-card">
                                 <div class="employee-photo">
-                                    <?php if (!empty($employee['img_profile'])): ?>
+                                    <?php if (!empty($employee['img'])): ?>
                                         <img src="data:<?= htmlspecialchars($employee['mime_type']) ?>;base64,<?= base64_encode($employee['img_profile']) ?>" alt="Photo de profil">
                                     <?php else: ?>
                                         <i class="fas fa-user"></i>
@@ -505,12 +508,15 @@ if ($view_employees && $current_us_ppr) {
                                 <a href="?view_employees=true&ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-primary">
                                     <i class="fas fa-users"></i> Employés
                                 </a>
-                                <a href="admin/us.php?PPR=<?= urlencode($us['PPR']) ?>" class="btn btn-warning">
-                                    <i class="fas fa-edit"></i> Modifier
-                                </a>
-                                <a href="?delete_ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette unité de service?')">
-                                    <i class="fas fa-trash"></i> Supprimer
-                                </a>
+                               <?php if ($role === 'admin'): ?>
+    <a href="admin/us.php?PPR=<?= urlencode($us['PPR']) ?>" class="btn btn-warning">
+        <i class="fas fa-edit"></i> Modifier
+    </a>
+    <a href="?delete_ppr=<?= urlencode($us['PPR']) ?>" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette unité de service?')">
+        <i class="fas fa-trash"></i> Supprimer
+    </a>
+<?php endif; ?>
+
                             </div>
                         </div>
                     <?php endforeach; ?>

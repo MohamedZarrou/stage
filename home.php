@@ -5,12 +5,6 @@ $db = Database::getInstance()->getConnection();
 
 // Check if user is logged in
 $loggedIn = isset($_SESSION['user']);
-
-// Get statistics (only if logged in)
-$totalEmployees = $loggedIn ? $db->query("SELECT COUNT(*) FROM utilisateurs")->fetchColumn() : 0;
-$directionEmployees = $loggedIn ? $db->query("SELECT COUNT(*) FROM utilisateurs WHERE fonction = 'Direction Régionale des Impôts'")->fetchColumn() : 0;
-$totalDiplomes = $loggedIn ? $db->query("SELECT COUNT(*) FROM diplome")->fetchColumn() : 0;
-$totalUnits = $loggedIn ? $db->query("SELECT COUNT(DISTINCT Code) FROM us")->fetchColumn() : 0;
 ?>
 
 <!DOCTYPE html>
@@ -133,77 +127,6 @@ $totalUnits = $loggedIn ? $db->query("SELECT COUNT(DISTINCT Code) FROM us")->fet
             transform: translateY(-3px);
         }
 
-        /* Stats Section */
-        .stats-section {
-            padding: 4rem 0;
-            background: white;
-        }
-
-        .section-title {
-            text-align: center;
-            margin-bottom: 3rem;
-            position: relative;
-        }
-
-        .section-title h2 {
-            font-size: 2rem;
-            color: var(--text-color);
-        }
-
-        .section-title::after {
-            content: '';
-            display: block;
-            width: 60px;
-            height: 4px;
-            background: var(--primary-color);
-            margin: 0.5rem auto 0;
-            border-radius: 2px;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .stat-card {
-            background: var(--secondary-color);
-            border-radius: 10px;
-            padding: 2rem;
-            text-align: center;
-            transition: var(--transition);
-            box-shadow: var(--shadow);
-            border-top: 4px solid var(--primary-color);
-        }
-
-        .stat-card i {
-            font-size: 2.5rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-
-        .stat-card h3 {
-            color: var(--text-light);
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-card p {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-color);
-        }
-
-        /* Login Notice */
-        .login-notice {
-            background: #f8f9fa;
-            padding: 2rem;
-            border-radius: 10px;
-            text-align: center;
-            margin-top: 2rem;
-            box-shadow: var(--shadow);
-        }
-
         /* Footer */
         footer {
             background: var(--text-color);
@@ -287,56 +210,6 @@ $totalUnits = $loggedIn ? $db->query("SELECT COUNT(DISTINCT Code) FROM us")->fet
                     <a href="signup.php" class="btn btn-outline">
                         <i class="fas fa-user-plus"></i> Sign Up
                     </a>
-                </div>
-            <?php endif; ?>
-        </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="stats-section">
-        <div class="container">
-            <div class="section-title">
-                <h2>Organization Overview</h2>
-            </div>
-            
-            <?php if ($loggedIn): ?>
-                <div class="stats">
-                    <div class="stat-card">
-                        <i class="fas fa-users"></i>
-                        <h3>Total Employees</h3>
-                        <p><?php echo $totalEmployees; ?></p>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <i class="fas fa-building"></i>
-                        <h3>Direction Régionale</h3>
-                        <p><?php echo $directionEmployees; ?></p>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <i class="fas fa-graduation-cap"></i>
-                        <h3>Total Graduates</h3>
-                        <p><?php echo $totalDiplomes; ?></p>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <i class="fas fa-sitemap"></i>
-                        <h3>Structural Units</h3>
-                        <p><?php echo $totalUnits; ?></p>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="login-notice">
-                    <h3><i class="fas fa-lock"></i> Restricted Access</h3>
-                    <p>Please login to view detailed organizational statistics and access all features of the employee portal.</p>
-                    <div class="auth-buttons" style="justify-content: center; margin-top: 1.5rem;">
-                        <a href="login.php" class="btn btn-primary" style="margin-right: 10px;">
-                            <i class="fas fa-sign-in-alt"></i> Login
-                        </a>
-                        <a href="signup.php" class="btn btn-outline" style="color: var(--text-color); border-color: var(--primary-color);">
-                            <i class="fas fa-user-plus"></i> Register
-                        </a>
-                    </div>
                 </div>
             <?php endif; ?>
         </div>
